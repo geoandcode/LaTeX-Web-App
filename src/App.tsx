@@ -254,9 +254,12 @@ export default function App() {
         return;
       }
 
-      const papers = document.querySelectorAll('.printable-paper');
+      const elements = docFormat === 'beamer' 
+        ? document.querySelectorAll('.beamer-print-sheet')
+        : document.querySelectorAll('.printable-paper');
+      
       let allPapersHtml = '';
-      papers.forEach(el => {
+      elements.forEach(el => {
         allPapersHtml += `
           <div style="margin-bottom: 40px; page-break-after: always; break-after: page;">
             ${el.outerHTML}
@@ -277,8 +280,35 @@ export default function App() {
             <script src="https://cdn.tailwindcss.com"></script>
             <style>
               body { background: white; color: black; font-family: serif; padding: 20px; }
+              .beamer-print-sheet {
+                background: white !important;
+                margin-bottom: 40px;
+                page-break-after: always;
+                break-after: page;
+                height: 277mm;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                box-sizing: border-box;
+                padding: 4mm 0;
+              }
+              .beamer-slide-page {
+                height: 107mm !important;
+                max-height: 107mm !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                box-shadow: none !important;
+                border: 1px solid #d1d5db !important;
+                margin: 0 !important;
+                transform: none !important;
+                padding: 4mm 6mm !important;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
               @media print {
+                @page { size: A4 portrait; margin: 10mm; }
                 body { padding: 0; }
+                .beamer-print-sheet { border: none !important; margin: 0 !important; }
                 .printable-paper { page-break-after: always; break-after: page; box-shadow: none !important; border: none !important; margin: 0 !important; }
               }
             </style>
@@ -369,11 +399,11 @@ export default function App() {
         const caption = capMatch ? capMatch[1] : '';
 
         return `
-          <div class="my-5 p-2 bg-gray-50 border border-gray-300 shadow-xs">
-            <div class="relative bg-white flex items-center justify-center overflow-hidden min-h-[160px]">
-              <img src="${imgSrc}" alt="${caption}" crossorigin="anonymous" class="w-full object-cover max-h-[280px]" />
+          <div class="my-2 p-1 bg-gray-50 border border-gray-300 shadow-xs max-w-xs mx-auto">
+            <div class="relative bg-white flex items-center justify-center overflow-hidden p-1">
+              <img src="${imgSrc}" alt="${caption}" crossorigin="anonymous" class="object-contain max-h-[110px] w-auto mx-auto" />
             </div>
-            ${caption ? `<div class="text-center text-[11px] text-gray-700 dark:text-gray-300 mt-2 font-serif italic"><strong>Figure ${figureCounter}:</strong> ${caption}</div>` : ''}
+            ${caption ? `<div class="text-center text-[10px] text-gray-700 dark:text-gray-300 mt-1 font-serif italic"><strong>Figure ${figureCounter}:</strong> ${caption}</div>` : ''}
           </div>
         `;
       });
@@ -390,7 +420,7 @@ export default function App() {
         const colSpec = tabMatch[1].replace(/\|/g, '').trim().split(/\s*/);
         const rows = tabMatch[2].split('\\\\').filter(r => r.trim() !== '');
         
-        let tableHtml = '<div class="my-6 overflow-x-auto"><table class="w-full border-collapse font-serif text-xs">';
+        let tableHtml = '<div class="my-2 overflow-x-auto"><table class="w-full border-collapse font-serif text-[10px]">';
         
         const cleanedRows = rows.map(r => r.replace(/\\hline/g, '').trim()).filter(r => r !== '');
 
@@ -405,14 +435,14 @@ export default function App() {
           cols.forEach((col, cIdx) => {
             const tag = isHeader ? 'th' : 'td';
             const align = colSpec[cIdx] === 'r' ? 'text-right' : colSpec[cIdx] === 'c' ? 'text-center' : 'text-left';
-            tableHtml += `<${tag} class="py-2.5 px-3 ${align} ${isHeader ? 'font-semibold tracking-wide uppercase text-[11px]' : ''}">${col}</${tag}>`;
+            tableHtml += `<${tag} class="py-1 px-2 ${align} ${isHeader ? 'font-semibold tracking-wide uppercase text-[10px]' : ''}">${col}</${tag}>`;
           });
           tableHtml += '</tr>';
         });
 
         tableHtml += '</table>';
         if (caption) {
-          tableHtml += `<div class="text-left text-[11px] text-gray-600 dark:text-gray-400 mt-2 font-serif italic"><strong>Table ${tableCounter}:</strong> ${caption}</div>`;
+          tableHtml += `<div class="text-left text-[9px] text-gray-600 dark:text-gray-400 mt-1 font-serif italic"><strong>Table ${tableCounter}:</strong> ${caption}</div>`;
         }
         tableHtml += '</div>';
         return tableHtml;
@@ -471,28 +501,134 @@ export default function App() {
       const runningCenter = title ? title : 'Interferometric Analysis Report';
       const runningRight = 'A.Y: 2024/2025';
 
-      // Build slides array for Beamer format from fully rendered bodyHtml
+      // Build fully distributed Beamer slides across as many slides of standard size as needed
       const slides: Array<{ title: string; body: string }> = [];
-      const h2Parts = bodyHtml.split('<h2');
 
-      if (h2Parts[0].trim()) {
+      if (abstract) {
         slides.push({
-          title: title || 'Overview',
-          body: h2Parts[0]
+          title: 'Abstract & Overview',
+          body: `<p class="italic text-[11px] leading-snug text-justify">${abstract}</p>`
         });
       }
 
-      for (let i = 1; i < h2Parts.length; i++) {
-        const part = h2Parts[i];
-        const closeIdx = part.indexOf('</h2>');
-        const h2Title = closeIdx !== -1 ? part.substring(0, closeIdx).replace(/^[^>]*>/, '').trim() : `Slide ${i}`;
-        const h2Body = closeIdx !== -1 ? part.substring(closeIdx + 5) : part;
+      const sectionBlocks = raw.split(/(?=\\section\{)/g);
 
-        slides.push({
-          title: h2Title,
-          body: `<h2 class="text-lg font-bold font-serif mb-3 text-indigo-600 dark:text-indigo-400">${h2Title}</h2>\n` + h2Body
+      sectionBlocks.forEach(secBlock => {
+        const secMatch = secBlock.match(/\\section\{(.*?)\}/);
+        const secTitle = secMatch ? secMatch[1].replace(/\\&/g, '&') : (title || 'Overview');
+        let content = secBlock.replace(/\\section\{.*?\}/, '').trim();
+
+        // 1. Extract figures into dedicated slides
+        const figRegex = /\\begin\{figure\}([\s\S]*?)\\end\{figure\}/g;
+        let match;
+        const figures: Array<{ caption: string; html: string }> = [];
+        while ((match = figRegex.exec(content)) !== null) {
+          const figContent = match[1];
+          const imgMatch = figContent.match(/\[IMAGE:(.*?)\]/);
+          const capMatch = figContent.match(/\\caption\{(.*?)\}/);
+          const imgSrc = imgMatch ? imgMatch[1] : '';
+          const caption = capMatch ? capMatch[1] : 'Figure';
+          figureCounter++;
+          const figHtml = `
+            <div class="my-1 p-1 bg-white border border-gray-200 shadow-xs flex flex-col items-center justify-center">
+              <img src="${imgSrc}" alt="${caption}" crossorigin="anonymous" class="object-contain max-h-[140px] w-auto mx-auto" />
+              <div class="text-center text-[10px] text-gray-700 mt-1 font-serif italic"><strong>Figure ${figureCounter}:</strong> ${caption}</div>
+            </div>
+          `;
+          figures.push({ caption, html: figHtml });
+          content = content.replace(match[0], '');
+        }
+
+        // 2. Extract tables into dedicated slides
+        const tabRegex = /\\begin\{table\}([\s\S]*?)\\end\{table\}/g;
+        const tables: Array<{ caption: string; html: string }> = [];
+        while ((match = tabRegex.exec(content)) !== null) {
+          const tabContent = match[1];
+          tableCounter++;
+          const capMatch = tabContent.match(/\\caption\{(.*?)\}/);
+          const caption = capMatch ? capMatch[1] : 'Table';
+
+          const tabMatchData = tabContent.match(/\\begin\{tabular\}\{(.*?)\}(.*?)\\end\{tabular\}/s);
+          if (tabMatchData) {
+            const colSpec = tabMatchData[1].replace(/\|/g, '').trim().split(/\s*/);
+            const rows = tabMatchData[2].split('\\\\').filter(r => r.trim() !== '');
+            let tableHtml = '<div class="my-1 overflow-x-auto"><table class="w-full border-collapse font-serif text-[10px] bg-white shadow-xs">';
+            const cleanedRows = rows.map(r => r.replace(/\\hline/g, '').trim()).filter(r => r !== '');
+
+            cleanedRows.forEach((row, idx) => {
+              const cols = row.split('&').map(c => c.trim());
+              const isHeader = idx === 0;
+              const borderClass = idx === 0 ? 'border-t-2 border-b border-gray-900 font-semibold bg-gray-50' :
+                                  idx === cleanedRows.length - 1 ? 'border-b border-gray-900' : 'border-b border-gray-200';
+
+              tableHtml += `<tr class="${borderClass}">`;
+              cols.forEach((col, cIdx) => {
+                const tag = isHeader ? 'th' : 'td';
+                const align = colSpec[cIdx] === 'r' ? 'text-right' : colSpec[cIdx] === 'c' ? 'text-center' : 'text-left';
+                tableHtml += `<${tag} class="py-1 px-2 ${align} ${isHeader ? 'font-semibold tracking-wide uppercase text-[10px]' : ''}">${col}</${tag}>`;
+              });
+              tableHtml += '</tr>';
+            });
+
+            tableHtml += '</table>';
+            if (caption) {
+              tableHtml += `<div class="text-center text-[9px] text-gray-700 mt-1 font-serif italic"><strong>Table ${tableCounter}:</strong> ${caption}</div>`;
+            }
+            tableHtml += '</div>';
+            tables.push({ caption, html: tableHtml });
+          }
+          content = content.replace(match[0], '');
+        }
+
+        // 3. Extract itemize lists into dedicated slides
+        const itemizeRegex = /\\begin\{itemize\}([\s\S]*?)\\end\{itemize\}/g;
+        const itemizeLists: string[] = [];
+        while ((match = itemizeRegex.exec(content)) !== null) {
+          const items = match[1].split('\\item').filter((i: string) => i.trim() !== '');
+          let listHtml = '<ul class="list-disc pl-4 space-y-0.5 font-serif text-[11px]">';
+          items.forEach((item: string) => {
+            listHtml += `<li>${item.trim()}</li>`;
+          });
+          listHtml += '</ul>';
+          itemizeLists.push(listHtml);
+          content = content.replace(match[0], '');
+        }
+
+        // 4. Distribute paragraphs into individual slides so every paragraph gets fitted cleanly onto standard size slides
+        const paragraphs = content.split(/\n\s*\n/).map(b => b.trim()).filter(b => b);
+
+        paragraphs.forEach((p, pIdx) => {
+          let pHtml = `<p class="mb-1.5 leading-snug text-justify text-[11px]">${p.replace(/\n/g, ' ')}</p>`;
+          mathStore.forEach((renderedMath, idx) => {
+            pHtml = pHtml.replace(`__MATH_PLACEHOLDER_${idx}__`, renderedMath);
+          });
+          slides.push({
+            title: paragraphs.length > 1 ? `${secTitle} (Part ${pIdx + 1})` : secTitle,
+            body: pHtml
+          });
         });
-      }
+
+        itemizeLists.forEach((listHtml, lIdx) => {
+          slides.push({
+            title: itemizeLists.length > 1 ? `${secTitle} (Key Points ${lIdx + 1})` : `${secTitle} (Key Points)`,
+            body: listHtml
+          });
+        });
+
+        figures.forEach(fig => {
+          slides.push({
+            title: `${secTitle} — Data Graphic`,
+            body: fig.html
+          });
+        });
+
+        tables.forEach(tab => {
+          slides.push({
+            title: `${secTitle} — Tabular Analysis`,
+            body: tab.html
+          });
+        });
+      });
 
       if (slides.length === 0) {
         slides.push({
@@ -711,15 +847,16 @@ export default function App() {
             {docFormat === 'beamer' ? (
               <div className="space-y-8 max-w-[760px] mx-auto w-full">
                 {(() => {
+                  const slides = [...renderedContent.slides];
+                  if (slides.length % 2 !== 0) {
+                    slides.push({ title: 'Summary / Q&A', body: '<p class="italic text-gray-500">End of presentation slides.</p>' });
+                  }
                   const slidePairs: Array<Array<typeof renderedContent.slides[0]>> = [];
-                  for (let i = 0; i < renderedContent.slides.length; i += 2) {
-                    slidePairs.push(renderedContent.slides.slice(i, i + 2));
+                  for (let i = 0; i < slides.length; i += 2) {
+                    slidePairs.push(slides.slice(i, i + 2));
                   }
                   return slidePairs.map((pair, pIdx) => (
-                    <div key={pIdx} className="beamer-print-sheet bg-white/40 dark:bg-zinc-900/40 p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-6">
-                      <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider text-center pb-1 border-b border-gray-200 dark:border-zinc-800">
-                        A4 Portrait Page {pIdx + 1} (2 Slides)
-                      </div>
+                    <div key={pIdx} className="beamer-print-sheet printable-paper bg-white/40 dark:bg-zinc-900/40 p-2 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
                       {pair.map((slide, sIdx) => {
                         const globalIndex = pIdx * 2 + sIdx;
                         return (
@@ -727,29 +864,29 @@ export default function App() {
                             key={globalIndex}
                             ref={globalIndex === 0 ? paperRef : undefined}
                             style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-                            className={`beamer-slide-page printable-paper w-full shadow-xl transition-transform duration-150 p-6 lg:p-8 min-h-[360px] rounded-xl flex flex-col justify-between ${
+                            className={`beamer-slide-page w-full shadow-xl transition-transform duration-150 p-4 lg:p-5 h-[250px] max-h-[250px] rounded-xl flex flex-col justify-between overflow-hidden ${
                               theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
                               theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
                               'bg-zinc-900 text-gray-100 border border-zinc-800'
                             }`}
                           >
-                            <div>
-                              <div className="pb-2 mb-3 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center text-xs font-sans text-gray-500">
+                            <div className="shrink-0">
+                              <div className="pb-1 mb-1 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] font-sans text-gray-500">
                                 <span className="font-bold">{renderedContent.title || 'Presentation'}</span>
                                 <span>{renderedContent.author}</span>
                               </div>
 
-                              <h2 className="text-base font-bold font-serif mb-3 text-indigo-600 dark:text-indigo-400">
+                              <h2 className="text-xs font-bold font-serif mb-1 text-indigo-600 dark:text-indigo-400">
                                 {slide.title}
                               </h2>
-
-                              <div 
-                                className="font-serif text-xs leading-relaxed space-y-2"
-                                dangerouslySetInnerHTML={{ __html: slide.body }}
-                              />
                             </div>
 
-                            <div className="mt-8 pt-2 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-mono">
+                            <div 
+                              className="font-serif text-[10px] leading-tight space-y-1 overflow-hidden flex-1 my-1"
+                              dangerouslySetInnerHTML={{ __html: slide.body }}
+                            />
+
+                            <div className="shrink-0 pt-1.5 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[9px] text-gray-400 font-mono">
                               <span>{renderedContent.institute}</span>
                               <span className="font-bold text-indigo-600 dark:text-indigo-400">Slide {globalIndex + 1} of {renderedContent.slides.length}</span>
                             </div>
