@@ -1,0 +1,6 @@
+{
+  "name": "LaTeX Report Studio",
+  "description": "Professional LaTeX & Academic Report Writer with Live Preview and PDF Export",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
