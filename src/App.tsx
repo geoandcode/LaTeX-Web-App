@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import katex from 'katex';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { 
   FileText, Code, Download, Eye, Settings, HelpCircle, 
   Sparkles, Copy, Check, RefreshCw, ZoomIn, ZoomOut, 
@@ -12,7 +14,7 @@ import {
   Plus, Trash2, Edit3, Save, Share2, Award, Terminal, Image as ImageIcon, Layout, Loader2, AlertCircle
 } from 'lucide-react';
 
-// --- TEMPLATES ---
+/// --- TEMPLATES ---
 const TEMPLATES = [
   {
     id: 'sentinel',
@@ -50,7 +52,7 @@ $$\\phi = \\phi_{\\text{topo}} + \\phi_{\\text{defo}} + \\phi_{\\text{atmos}} + 
 
 \\begin{table}
 \\centering
-\\begin{tabular}{|l|c|r|}
+\\begin{tabular}{lcr}
 \\hline
 Parameter & Value & Unit \\\\ \\hline
 Center Frequency & 5.405 & GHz (C-band) \\\\
@@ -62,6 +64,39 @@ Repeat Cycle & 12 & Days \\\\ \\hline
 
 \\section{Conclusion}
 The DInSAR time series confirms continuous uplift acceleration in the Rione Terra sector of Pozzuoli.
+`
+  },
+  {
+    id: 'tufte',
+    name: 'Tufte Handout (Edward Tufte Style)',
+    description: 'Minimalist Tufte handout layout with sans-serif headings, serif body text, and uncluttered tabular data presentation.',
+    format: 'a4',
+    content: `\\documentclass{tufte-handout}
+\\title{Visualizing Information Design Principles}
+\\author{Edward Tufte \\and Graphics Press}
+\\institute{Yale University}
+
+\\begin{abstract}
+Data graphics and tables should draw the viewer's attention to the sense and substance of the data, not to quantitative flatness or design gimmickry. Tufte-style documents prioritize typographic clarity and data-dense tabular presentation without unnecessary gridlines.
+\\end{abstract}
+
+\\section{Minimalist Table Design}
+Tables should be clean and uncluttered by unnecessary vertical gridlines. Edward Tufte famously noted that tables should have no vertical rules and only three horizontal rules.
+
+\\begin{table}
+\\centering
+\\begin{tabular}{lcr}
+\\hline
+Metric & Baseline & Tufte Optimal \\\\ \\hline
+Ink-to-Data Ratio & 0.24 & 0.92 \\\\
+Cognitive Load & High & Minimal \\\\
+Visual Clutter & Severe & Zero \\\\ \\hline
+\\end{tabular}
+\\caption{Comparison of traditional grid tables versus Tufte minimalist tabular design.}
+\\end{table}
+
+\\section{Typography & Margin Notes}
+By combining serif body text with clean sans-serif headers and generous whitespace, documents achieve exceptional readability.
 `
   },
   {
@@ -128,7 +163,7 @@ $$\\mathcal{L}(\\theta) = \\sum_{i=1}^{N} \\left( y_i - \\hat{y}_i \\right)^2 + 
 
 \\begin{table}
 \\centering
-\\begin{tabular}{|l|c|r|}
+\\begin{tabular}{lcr}
 \\hline
 Model & Latency (ms) & Accuracy \\\\ \\hline
 Baseline LaTeX & 1420 & 94.2\\% \\\\
@@ -206,35 +241,67 @@ export default function App() {
     document.body.removeChild(element);
   };
 
-  // Backend pdflatex compilation trigger and direct file download dialog
-  const handleExportPDF = async () => {
+  // Robust PDF export using a dedicated print window popup to print all pages / slides
+  const handleExportPDF = () => {
     if (isExporting) return;
     setIsExporting(true);
     setErrorMessage(null);
     try {
-      const response = await fetch('/api/compile-latex', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latexCode: markdown, filename: selectedTemplate })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Server compilation failed with status ${response.status}`);
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        window.print();
+        setIsExporting(false);
+        return;
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${selectedTemplate}-report.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const papers = document.querySelectorAll('.printable-paper');
+      let allPapersHtml = '';
+      papers.forEach(el => {
+        allPapersHtml += `
+          <div style="margin-bottom: 40px; page-break-after: always; break-after: page;">
+            ${el.outerHTML}
+          </div>
+        `;
+      });
+
+      if (!allPapersHtml && paperRef.current) {
+        allPapersHtml = paperRef.current.outerHTML;
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${renderedContent.title || selectedTemplate}</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              body { background: white; color: black; font-family: serif; padding: 20px; }
+              @media print {
+                body { padding: 0; }
+                .printable-paper { page-break-after: always; break-after: page; box-shadow: none !important; border: none !important; margin: 0 !important; }
+              }
+            </style>
+          </head>
+          <body>
+            <div style="max-width: 880px; margin: 0 auto;">
+              ${allPapersHtml}
+            </div>
+            <script>
+              setTimeout(() => {
+                window.print();
+              }, 500);
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
     } catch (err: any) {
       console.error('PDF Export Error:', err);
       setErrorMessage(err.message || String(err));
+      try {
+        window.print();
+      } catch (e) {}
     } finally {
       setIsExporting(false);
     }
@@ -245,30 +312,31 @@ export default function App() {
     try {
       let raw = markdown;
 
-      // Extract metadata reactively
+      // Extract metadata reactively and replace escaped ampersands
       let title = '';
       let author = '';
       let institute = '';
       let abstract = '';
 
       const titleMatch = raw.match(/\\title\{(.*?)\}/s);
-      if (titleMatch) title = titleMatch[1];
+      if (titleMatch) title = titleMatch[1].replace(/\\&/g, '&');
 
       const authorMatch = raw.match(/\\author\{(.*?)\}/s);
-      if (authorMatch) author = authorMatch[1].replace(/\\and/g, '•');
+      if (authorMatch) author = authorMatch[1].replace(/\\and/g, '•').replace(/\\&/g, '&');
 
       const instMatch = raw.match(/\\institute\{(.*?)\}/s);
-      if (instMatch) institute = instMatch[1].replace(/\\and/g, '•');
+      if (instMatch) institute = instMatch[1].replace(/\\and/g, '•').replace(/\\&/g, '&');
 
       const absMatch = raw.match(/\\begin\{abstract\}(.*?)(?:\\end\{abstract\}|\\0)/s);
-      if (absMatch) abstract = absMatch[1].trim();
+      if (absMatch) abstract = absMatch[1].trim().replace(/\\&/g, '&');
 
-      // Remove header commands from body
+      // Remove header commands from body and replace escaped ampersands
       raw = raw
         .replace(/\\title\{.*?\}/s, '')
         .replace(/\\author\{.*?\}/s, '')
         .replace(/\\institute\{.*?\}/s, '')
-        .replace(/\\begin\{abstract\}[\s\S]*?(?:\\end\{abstract\}|\\0)/s, '');
+        .replace(/\\begin\{abstract\}[\s\S]*?(?:\\end\{abstract\}|\\0)/s, '')
+        .replace(/\\&/g, '&');
 
       // Store placeholders for math blocks
       const mathStore: string[] = [];
@@ -289,50 +357,62 @@ export default function App() {
       // 2. Replace Inline Math $ ... $
       raw = raw.replace(/\$([^\$\n]+?)\$/g, (_, math) => storeMath(math, false));
 
-      // 3. Figures with images and captions
+      let figureCounter = 0;
+      let tableCounter = 0;
+
+      // 3. Figures with images and captions (with auto sequential numbering)
       raw = raw.replace(/\\begin\{figure\}([\s\S]*?)\\end\{figure\}/gs, (_, content) => {
+        figureCounter++;
         const imgMatch = content.match(/\[IMAGE:(.*?)\]/);
         const capMatch = content.match(/\\caption\{(.*?)\}/);
         const imgSrc = imgMatch ? imgMatch[1] : '';
         const caption = capMatch ? capMatch[1] : '';
 
         return `
-          <div class="my-4 border border-gray-400 bg-zinc-900 p-1.5 shadow-sm">
-            <div class="relative bg-black flex items-center justify-center overflow-hidden min-h-[160px]">
-              <img src="${imgSrc}" alt="${caption}" crossorigin="anonymous" class="w-full object-cover max-h-[260px] opacity-95 hover:opacity-100 transition" />
+          <div class="my-5 p-2 bg-gray-50 border border-gray-300 shadow-xs">
+            <div class="relative bg-white flex items-center justify-center overflow-hidden min-h-[160px]">
+              <img src="${imgSrc}" alt="${caption}" crossorigin="anonymous" class="w-full object-cover max-h-[280px]" />
             </div>
-            ${caption ? `<div class="text-center text-[11px] text-gray-700 dark:text-gray-300 mt-1.5 font-serif italic">Figure: ${caption}</div>` : ''}
+            ${caption ? `<div class="text-center text-[11px] text-gray-700 dark:text-gray-300 mt-2 font-serif italic"><strong>Figure ${figureCounter}:</strong> ${caption}</div>` : ''}
           </div>
         `;
       });
 
-      // 4. Tables
+      // 4. Tables (Edward Tufte Style with auto sequential numbering)
       raw = raw.replace(/\\begin\{table\}.*?\\end\{table\}/gs, (match) => {
+        tableCounter++;
         const capMatch = match.match(/\\caption\{(.*?)\}/);
         const caption = capMatch ? capMatch[1] : '';
 
         const tabMatch = match.match(/\\begin\{tabular\}\{(.*?)\}(.*?)\\end\{tabular\}/s);
         if (!tabMatch) return match;
 
+        const colSpec = tabMatch[1].replace(/\|/g, '').trim().split(/\s*/);
         const rows = tabMatch[2].split('\\\\').filter(r => r.trim() !== '');
-        let tableHtml = '<div class="my-4 overflow-x-auto"><table class="w-full border-collapse border border-gray-400 text-xs font-serif">';
         
-        rows.forEach((row, idx) => {
-          if (row.includes('\\hline')) return;
-          const cols = row.split('&').map(c => c.trim().replace(/\\hline/g, ''));
-          const isHeader = idx === 0 || (idx === 1 && rows[0].includes('\\hline'));
+        let tableHtml = '<div class="my-6 overflow-x-auto"><table class="w-full border-collapse font-serif text-xs">';
+        
+        const cleanedRows = rows.map(r => r.replace(/\\hline/g, '').trim()).filter(r => r !== '');
+
+        cleanedRows.forEach((row, idx) => {
+          const cols = row.split('&').map(c => c.trim());
+          const isHeader = idx === 0;
           
-          tableHtml += '<tr class="border-b border-gray-300">';
-          cols.forEach(col => {
+          const borderClass = idx === 0 ? 'border-t-2 border-b border-gray-900 dark:border-gray-100 font-semibold' :
+                              idx === cleanedRows.length - 1 ? 'border-b border-gray-900 dark:border-gray-100' : 'border-b border-gray-200 dark:border-zinc-800';
+
+          tableHtml += `<tr class="${borderClass}">`;
+          cols.forEach((col, cIdx) => {
             const tag = isHeader ? 'th' : 'td';
-            tableHtml += `<${tag} class="border border-gray-300 px-2 py-1.5 ${isHeader ? 'bg-gray-100 dark:bg-zinc-800 font-bold text-center' : 'text-left'}">${col}</${tag}>`;
+            const align = colSpec[cIdx] === 'r' ? 'text-right' : colSpec[cIdx] === 'c' ? 'text-center' : 'text-left';
+            tableHtml += `<${tag} class="py-2.5 px-3 ${align} ${isHeader ? 'font-semibold tracking-wide uppercase text-[11px]' : ''}">${col}</${tag}>`;
           });
           tableHtml += '</tr>';
         });
 
         tableHtml += '</table>';
         if (caption) {
-          tableHtml += `<div class="text-center text-[11px] text-gray-600 dark:text-gray-400 mt-1 font-serif italic">Table: ${caption}</div>`;
+          tableHtml += `<div class="text-left text-[11px] text-gray-600 dark:text-gray-400 mt-2 font-serif italic"><strong>Table ${tableCounter}:</strong> ${caption}</div>`;
         }
         tableHtml += '</div>';
         return tableHtml;
@@ -391,12 +471,43 @@ export default function App() {
       const runningCenter = title ? title : 'Interferometric Analysis Report';
       const runningRight = 'A.Y: 2024/2025';
 
+      // Build slides array for Beamer format from fully rendered bodyHtml
+      const slides: Array<{ title: string; body: string }> = [];
+      const h2Parts = bodyHtml.split('<h2');
+
+      if (h2Parts[0].trim()) {
+        slides.push({
+          title: title || 'Overview',
+          body: h2Parts[0]
+        });
+      }
+
+      for (let i = 1; i < h2Parts.length; i++) {
+        const part = h2Parts[i];
+        const closeIdx = part.indexOf('</h2>');
+        const h2Title = closeIdx !== -1 ? part.substring(0, closeIdx).replace(/^[^>]*>/, '').trim() : `Slide ${i}`;
+        const h2Body = closeIdx !== -1 ? part.substring(closeIdx + 5) : part;
+
+        slides.push({
+          title: h2Title,
+          body: `<h2 class="text-lg font-bold font-serif mb-3 text-indigo-600 dark:text-indigo-400">${h2Title}</h2>\n` + h2Body
+        });
+      }
+
+      if (slides.length === 0) {
+        slides.push({
+          title: title || 'Presentation',
+          body: bodyHtml
+        });
+      }
+
       return {
         title,
         author,
         institute,
         abstract,
         body: bodyHtml,
+        slides,
         runningLeft,
         runningCenter,
         runningRight
@@ -408,6 +519,7 @@ export default function App() {
         institute: '',
         abstract: '',
         body: `<div class="text-red-600 p-4 font-mono">Error parsing LaTeX document: ${String(err)}</div>`,
+        slides: [{ title: 'Error', body: `<div class="text-red-600 p-4 font-mono">Error parsing LaTeX document: ${String(err)}</div>` }],
         runningLeft: 'Error',
         runningCenter: 'Error',
         runningRight: '2024'
@@ -595,62 +707,114 @@ export default function App() {
               <span>Instantaneous Render Engine Active</span>
             </div>
 
-            {/* PAPER SHEET */}
-            <div 
-              ref={paperRef}
-              style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-              className={`printable-paper mx-auto w-full shadow-2xl transition-transform duration-150 ${
-                docFormat === 'a4' ? 'max-w-[720px] p-10 lg:p-12 min-h-[960px]' : 'max-w-[880px] p-12 lg:p-16 min-h-[580px] rounded-lg'
-              } ${
-                theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
-                theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
-                'bg-zinc-900 text-gray-100 border border-zinc-800'
-              }`}
-            >
-              {/* ACADEMIC RUNNING HEADER */}
-              <div className="pb-2.5 mb-6 border-b border-gray-400 dark:border-zinc-700 flex justify-between items-center text-[10px] font-serif text-gray-600 dark:text-gray-400">
-                <span className="font-bold">{renderedContent.runningLeft}</span>
-                <span className="italic truncate max-w-[240px] sm:max-w-sm">{renderedContent.runningCenter}</span>
-                <span className="font-mono">{renderedContent.runningRight}</span>
+            {/* PAPER SHEET OR SLIDES */}
+            {docFormat === 'beamer' ? (
+              <div className="space-y-8 max-w-[760px] mx-auto w-full">
+                {(() => {
+                  const slidePairs: Array<Array<typeof renderedContent.slides[0]>> = [];
+                  for (let i = 0; i < renderedContent.slides.length; i += 2) {
+                    slidePairs.push(renderedContent.slides.slice(i, i + 2));
+                  }
+                  return slidePairs.map((pair, pIdx) => (
+                    <div key={pIdx} className="beamer-print-sheet bg-white/40 dark:bg-zinc-900/40 p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-6">
+                      <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider text-center pb-1 border-b border-gray-200 dark:border-zinc-800">
+                        A4 Portrait Page {pIdx + 1} (2 Slides)
+                      </div>
+                      {pair.map((slide, sIdx) => {
+                        const globalIndex = pIdx * 2 + sIdx;
+                        return (
+                          <div 
+                            key={globalIndex}
+                            ref={globalIndex === 0 ? paperRef : undefined}
+                            style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
+                            className={`beamer-slide-page printable-paper w-full shadow-xl transition-transform duration-150 p-6 lg:p-8 min-h-[360px] rounded-xl flex flex-col justify-between ${
+                              theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
+                              theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
+                              'bg-zinc-900 text-gray-100 border border-zinc-800'
+                            }`}
+                          >
+                            <div>
+                              <div className="pb-2 mb-3 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center text-xs font-sans text-gray-500">
+                                <span className="font-bold">{renderedContent.title || 'Presentation'}</span>
+                                <span>{renderedContent.author}</span>
+                              </div>
+
+                              <h2 className="text-base font-bold font-serif mb-3 text-indigo-600 dark:text-indigo-400">
+                                {slide.title}
+                              </h2>
+
+                              <div 
+                                className="font-serif text-xs leading-relaxed space-y-2"
+                                dangerouslySetInnerHTML={{ __html: slide.body }}
+                              />
+                            </div>
+
+                            <div className="mt-8 pt-2 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-mono">
+                              <span>{renderedContent.institute}</span>
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400">Slide {globalIndex + 1} of {renderedContent.slides.length}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
               </div>
-
-              {/* DOCUMENT TITLE & AUTHOR */}
-              <div className="text-center pb-5 border-b border-gray-200 dark:border-zinc-800 mb-5">
-                <h1 className={`font-bold font-serif mb-2 tracking-wide ${docFormat === 'a4' ? 'text-xl' : 'text-2xl'}`}>
-                  {renderedContent.title || 'Untitled Report'}
-                </h1>
-                {renderedContent.author && (
-                  <div className="text-xs font-serif font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {renderedContent.author}
-                  </div>
-                )}
-                {renderedContent.institute && (
-                  <div className="text-[11px] font-serif italic text-gray-500 dark:text-gray-400">
-                    {renderedContent.institute}
-                  </div>
-                )}
-              </div>
-
-              {/* ABSTRACT IF PRESENT */}
-              {renderedContent.abstract && (
-                <div className="my-5 px-5 py-2.5 bg-gray-50 dark:bg-zinc-800/50 border-l-3 border-indigo-600 font-serif text-xs">
-                  <h4 className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Abstract</h4>
-                  <p className="italic leading-normal text-justify">{renderedContent.abstract}</p>
-                </div>
-              )}
-
-              {/* DOCUMENT BODY */}
+            ) : (
               <div 
-                className="font-serif text-sm leading-normal space-y-3.5"
-                dangerouslySetInnerHTML={{ __html: renderedContent.body }}
-              />
+                ref={paperRef}
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
+                className={`printable-paper mx-auto w-full shadow-2xl transition-transform duration-150 max-w-[720px] p-10 lg:p-12 min-h-[960px] ${
+                  theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
+                  theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
+                  'bg-zinc-900 text-gray-100 border border-zinc-800'
+                }`}
+              >
+                {/* ACADEMIC RUNNING HEADER */}
+                <div className="pb-2.5 mb-6 border-b border-gray-400 dark:border-zinc-700 flex justify-between items-center text-[10px] font-serif text-gray-600 dark:text-gray-400">
+                  <span className="font-bold">{renderedContent.runningLeft}</span>
+                  <span className="italic truncate max-w-[240px] sm:max-w-sm">{renderedContent.runningCenter}</span>
+                  <span className="font-mono">{renderedContent.runningRight}</span>
+                </div>
 
-              {/* FOOTER */}
-              <div className="mt-14 pt-4 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-serif">
-                <span>Gummi LaTeX Studio Preview</span>
-                <span>Page 1 of 1</span>
+                {/* DOCUMENT TITLE & AUTHOR */}
+                <div className="text-center pb-5 border-b border-gray-200 dark:border-zinc-800 mb-5">
+                  <h1 className="font-bold font-serif mb-2 tracking-wide text-xl">
+                    {renderedContent.title || 'Untitled Report'}
+                  </h1>
+                  {renderedContent.author && (
+                    <div className="text-xs font-serif font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {renderedContent.author}
+                    </div>
+                  )}
+                  {renderedContent.institute && (
+                    <div className="text-[11px] font-serif italic text-gray-500 dark:text-gray-400">
+                      {renderedContent.institute}
+                    </div>
+                  )}
+                </div>
+
+                {/* ABSTRACT IF PRESENT */}
+                {renderedContent.abstract && (
+                  <div className="my-5 px-5 py-2.5 bg-gray-50 dark:bg-zinc-800/50 border-l-3 border-indigo-600 font-serif text-xs">
+                    <h4 className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Abstract</h4>
+                    <p className="italic leading-normal text-justify">{renderedContent.abstract}</p>
+                  </div>
+                )}
+
+                {/* DOCUMENT BODY */}
+                <div 
+                  className="font-serif text-sm leading-normal space-y-3.5"
+                  dangerouslySetInnerHTML={{ __html: renderedContent.body }}
+                />
+
+                {/* FOOTER */}
+                <div className="mt-14 pt-4 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-serif">
+                  <span>Gummi LaTeX Studio Preview</span>
+                  <span>Page 1 of 1</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

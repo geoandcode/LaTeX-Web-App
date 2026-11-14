@@ -1,13 +1,45 @@
 @import "tailwindcss";
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
   body * {
     visibility: hidden;
   }
   .printable-paper, .printable-paper * {
     visibility: visible;
   }
-  .printable-paper {
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .beamer-print-sheet {
+    page-break-after: always;
+    break-after: page;
+    height: 277mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    padding: 4mm 0;
+  }
+  .beamer-slide-page {
+    height: 132mm !important;
+    max-height: 132mm !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    margin: 0 !important;
+    transform: none !important;
+    padding: 8mm !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .printable-paper:not(.beamer-slide-page) {
     position: absolute;
     left: 0;
     top: 0;
