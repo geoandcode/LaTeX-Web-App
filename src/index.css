@@ -3,7 +3,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 20mm;
   }
   body * {
     visibility: hidden;
@@ -15,40 +15,55 @@
     background: white !important;
     padding: 0 !important;
     margin: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .beamer-print-sheet {
     page-break-after: always;
     break-after: page;
-    height: 277mm;
+    height: 257mm;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 4mm;
+    justify-content: space-between;
+    gap: 6mm;
     box-sizing: border-box;
     padding: 0;
   }
   .beamer-slide-page {
-    height: 107mm !important;
-    max-height: 107mm !important;
+    height: 120mm !important;
+    max-height: 120mm !important;
     page-break-inside: avoid;
     break-inside: avoid;
     box-shadow: none !important;
     border: 1px solid #d1d5db !important;
     margin: 0 !important;
     transform: none !important;
-    padding: 4mm 6mm !important;
+    padding: 6mm 8mm !important;
     box-sizing: border-box;
     overflow: hidden;
   }
   .printable-paper:not(.beamer-slide-page) {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
+    position: relative;
+    width: 210mm !important;
+    height: 257mm !important;
+    max-width: none !important;
     margin: 0 !important;
-    padding: 20px !important;
+    padding: 15mm !important;
     box-shadow: none !important;
     border: none !important;
     transform: none !important;
+    background: white !important;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+  h1, h2, h3, figure, table, .my-2, .my-3 {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
+
+

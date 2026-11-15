@@ -21,49 +21,70 @@ const TEMPLATES = [
     name: 'Interferometric Analysis (Sentinel-1)',
     description: 'Academic lab report style with running headers, Sentinel-1 radar stacks, and interferograms.',
     format: 'a4',
-    content: `\\title{Interferometric SAR Analysis of Pozzuoli Deformation Field}
-\\author{Francesco Gambetta}
-\\institute{Politecnico di Milano \\and Department of Aerospace Engineering}
+    content: `\\title{Advanced Interferometric SAR Analysis of Campi Flegrei Caldera Deformation Field}
+\\author{Dr. Francesco Gambetta \\and Prof. Marco Pietra}
+\\institute{Politecnico di Milano \\and Department of Aerospace Science and Technology}
 
 \\begin{abstract}
-This report details the differential interferometric synthetic aperture radar (DInSAR) processing chain applied to Sentinel-1 acquisitions over the Pozzuoli caldera (Campi Flegrei). We examine co-registered stacks, perpendicular baseline distributions, and unwrapped phase fringes associated with ongoing bradyseism.
+This report details the advanced differential interferometric synthetic aperture radar (DInSAR) and Small Baseline Subset (SBAS) time-series processing chain applied to Sentinel-1 C-band acquisitions over the Pozzuoli caldera (Campi Flegrei, Italy). We examine co-registered SLC stacks, perpendicular baseline distributions, atmospheric phase screening, and unwrapped phase fringes associated with ongoing bradyseismic ground deformation. Quantitative velocity maps confirm sustained uplift acceleration in the Rione Terra sector.
 \\end{abstract}
 
-\\section{Coreregistered Stack}
-The SLC images acquired along descending track 22 were co-registered using enhanced spectral diversity (ESD) and precise orbit ephemerides. 
+\\section{Introduction \\& Geophysical Context}
+The Campi Flegrei caldera is a high-risk volcanic system characterized by recurring episodes of bradyseism—slow ground deformation driven by magmatic-hydrothermal fluid circulation. Monitoring surface displacement with millimeter precision requires advanced satellite radar interferometry. Sentinel-1 Interferometric Wide (IW) swath acquisitions provide systematic C-band imagery with a 12-day repeat cycle.
+
+Let the radar slant range $R$ from satellite position $\\mathbf{S}(t)$ to ground target $\\mathbf{P}$ be defined as:
+$$R(t) = \\| \\mathbf{S}(t) - \\mathbf{P} \\|$$
 
 \\begin{figure}
 [IMAGE:https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80]
-\\caption{Coregistered stack (RGB representation of amplitude and backscatter coherence).}
+\\caption{Sentinel-1 IW coregistered intensity mosaic over Campi Flegrei and Pozzuoli bay.}
 \\end{figure}
 
-The co-registration accuracy achieved sub-pixel precision ($\\sigma < 0.02$ pixels), enabling robust phase tracking across temporal baselines spanning 2024.
-
-\\section{Interferometric Phase \\& Baseline Distribution}
-Topographic phase contributions were removed using the Copernicus 30m DEM. The resulting interferograms exhibit high coherence over stable terrain while decorrelating in vegetated caldera sectors.
-
-\\begin{figure}
-[IMAGE:https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=800&q=80]
-\\caption{Perpendicular baseline temporal distribution and interferometric fringe rate.}
-\\end{figure}
-
-Let the interferometric phase $\\phi$ be expressed as the superposition of several geophysical components:
+\\section{Coregistration \\& Interferometric Phase Modeling}
+Single Look Complex (SLC) images acquired along descending track 22 were co-registered using Enhanced Spectral Diversity (ESD) and precise restituted orbit ephemerides. The interferometric phase $\\phi$ between master and slave acquisitions is modeled as:
 $$\\phi = \\phi_{\\text{topo}} + \\phi_{\\text{defo}} + \\phi_{\\text{atmos}} + \\phi_{\\text{orbit}} + \\epsilon$$
+
+Topographic phase contributions $\\phi_{\\text{topo}}$ were removed using the Copernicus 30m Digital Elevation Model (DEM), yielding the differential interferogram:
+$$\\Delta \\phi_{\\text{diff}} = \\phi_{\\text{defo}} + \\phi_{\\text{atmos}} + \\epsilon$$
 
 \\begin{table}
 \\centering
 \\begin{tabular}{lcr}
 \\hline
 Parameter & Value & Unit \\\\ \\hline
-Center Frequency & 5.405 & GHz (C-band) \\\\
-Polarization & VV & - \\\\
+Sensor & Sentinel-1A/B & C-band \\\\
+Center Frequency & 5.405 & GHz \\\\
+Wavelength ($\\lambda$) & 5.546 & cm \\\\
+Swath / Mode & IW / TOPS & - \\\\
+Orbit Track & Descending 22 & - \\\\
 Repeat Cycle & 12 & Days \\\\ \\hline
 \\end{tabular}
-\\caption{Sentinel-1 acquisition parameters for Pozzuoli dataset.}
+\\caption{Sentinel-1 radar acquisition parameters for Campi Flegrei stack.}
 \\end{table}
 
-\\section{Conclusion}
-The DInSAR time series confirms continuous uplift acceleration in the Rione Terra sector of Pozzuoli.
+\\section{Baseline Distribution \\& Coherence Estimation}
+Perpendicular baselines were maintained within $\\pm 45$ meters to minimize spatial decorrelation. The complex coherence $\\gamma$ over resolution cell $(x, y)$ is estimated as:
+$$\\gamma = \\frac{\\left| \\sum \\mathbf{s}_1(x,y) \\mathbf{s}_2^*(x,y) \\right|}{\\sqrt{\\sum |\\mathbf{s}_1(x,y)|^2 \\sum |\\mathbf{s}_2(x,y)|^2}}$$
+
+\\begin{figure}
+[IMAGE:https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=800&q=80]
+\\caption{Perpendicular baseline temporal distribution and spatial coherence evaluation.}
+\\end{figure}
+
+Areas with coherence $\\gamma > 0.75$ over urban structures enabled reliable phase unwrapping via minimum cost flow (MCF) algorithms.
+
+\\section{Atmospheric Phase Screening \\& Time-Series Inversion}
+Tropospheric delay anomalies (stratified and turbulent APS) were mitigated using ERA5 numerical weather model reanalysis combined with spatial-temporal filtering. Let the unwrapped displacement time series $d(t_k)$ be retrieved via singular value decomposition (SVD) of the SBAS network:
+$$\\mathbf{A} \\mathbf{v} = \\Delta \\phi$$
+where $\\mathbf{A}$ is the design matrix relating acquisitions to interferograms, and $\\mathbf{v}$ represents incremental velocities.
+
+\\begin{figure}
+[IMAGE:https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80]
+\\caption{SBAS time-series velocity gradient map showing uplift rates exceeding 12 cm/year.}
+\\end{figure}
+
+\\section{Discussion \\& Conclusion}
+The processed DInSAR time series confirms continuous, non-linear uplift acceleration centered beneath Pozzuoli town, with cumulative displacement exceeding 35 cm over the 2024 monitoring period. Future work will integrate GNSS continuous stations to resolve 3D displacement vectors.
 `
   },
   {
@@ -190,6 +211,32 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [compileStats, setCompileStats] = useState({ time: 0, words: 0, characters: 0 });
+  const [editorWidth, setEditorWidth] = useState<number>(50);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const windowWidth = window.innerWidth;
+      const newWidth = (e.clientX / windowWidth) * 100;
+      if (newWidth >= 20 && newWidth <= 80) {
+        setEditorWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   const paperRef = useRef<HTMLDivElement>(null);
 
@@ -279,48 +326,67 @@ export default function App() {
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
             <script src="https://cdn.tailwindcss.com"></script>
             <style>
-              body { background: white; color: black; font-family: serif; padding: 20px; }
-              .beamer-print-sheet {
+              @page {
+                size: A4 portrait;
+                margin: 20mm;
+              }
+              body { background: white; color: black; font-family: serif; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .printable-paper {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                max-width: none !important;
+                margin: 0 auto !important;
+                padding: 20mm !important;
+                box-sizing: border-box !important;
+                box-shadow: none !important;
+                border: none !important;
+                transform: none !important;
                 background: white !important;
-                margin-bottom: 40px;
                 page-break-after: always;
                 break-after: page;
-                height: 277mm;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+              }
+              .beamer-print-sheet {
+                background: white !important;
+                margin-bottom: 0;
+                page-break-after: always;
+                break-after: page;
+                height: 257mm;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
                 box-sizing: border-box;
-                padding: 4mm 0;
+                padding: 0;
               }
               .beamer-slide-page {
-                height: 107mm !important;
-                max-height: 107mm !important;
+                height: 120mm !important;
+                max-height: 120mm !important;
                 page-break-inside: avoid;
                 break-inside: avoid;
                 box-shadow: none !important;
                 border: 1px solid #d1d5db !important;
-                margin: 0 !important;
+                margin: 0 0 8mm 0 !important;
                 transform: none !important;
-                padding: 4mm 6mm !important;
+                padding: 6mm 8mm !important;
                 box-sizing: border-box;
                 overflow: hidden;
               }
               @media print {
-                @page { size: A4 portrait; margin: 10mm; }
-                body { padding: 0; }
-                .beamer-print-sheet { border: none !important; margin: 0 !important; }
-                .printable-paper { page-break-after: always; break-after: page; box-shadow: none !important; border: none !important; margin: 0 !important; }
+                body * { visibility: visible; }
+                .printable-paper { page-break-after: always; break-after: page; }
               }
             </style>
           </head>
           <body>
-            <div style="max-width: 880px; margin: 0 auto;">
+            <div style="width: 100%; margin: 0 auto;">
               ${allPapersHtml}
             </div>
             <script>
               setTimeout(() => {
                 window.print();
-              }, 500);
+              }, 600);
             </script>
           </body>
         </html>
@@ -637,12 +703,36 @@ export default function App() {
         });
       }
 
+      // Group parsed blocks into A4 pages (~1000 characters per page)
+      const a4Pages: string[] = [];
+      let currentPageBlocks: string[] = [];
+      let currentChars = 0;
+
+      parsedBlocks.forEach(block => {
+        const blockLen = block.length;
+        if (currentChars + blockLen > 3400 && currentPageBlocks.length > 0) {
+          a4Pages.push(currentPageBlocks.join('\n'));
+          currentPageBlocks = [block];
+          currentChars = blockLen;
+        } else {
+          currentPageBlocks.push(block);
+          currentChars += blockLen;
+        }
+      });
+      if (currentPageBlocks.length > 0) {
+        a4Pages.push(currentPageBlocks.join('\n'));
+      }
+      if (a4Pages.length === 0) {
+        a4Pages.push(bodyHtml);
+      }
+
       return {
         title,
         author,
         institute,
         abstract,
         body: bodyHtml,
+        a4Pages,
         slides,
         runningLeft,
         runningCenter,
@@ -655,6 +745,7 @@ export default function App() {
         institute: '',
         abstract: '',
         body: `<div class="text-red-600 p-4 font-mono">Error parsing LaTeX document: ${String(err)}</div>`,
+        a4Pages: [`<div class="text-red-600 p-4 font-mono">Error parsing LaTeX document: ${String(err)}</div>`],
         slides: [{ title: 'Error', body: `<div class="text-red-600 p-4 font-mono">Error parsing LaTeX document: ${String(err)}</div>` }],
         runningLeft: 'Error',
         runningCenter: 'Error',
@@ -811,10 +902,13 @@ export default function App() {
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden select-none">
         {/* EDITOR PANEL */}
         {(viewMode === 'split' || viewMode === 'editor') && (
-          <div className={`flex flex-col h-full border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+          <div 
+            style={viewMode === 'split' ? { width: `${editorWidth}%` } : undefined}
+            className={`flex flex-col h-full border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 ${viewMode === 'split' ? '' : 'w-full'}`}
+          >
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border-b border-gray-200 dark:border-zinc-800 text-xs font-semibold text-gray-600 dark:text-gray-400">
               <div className="flex items-center space-x-2">
                 <Code className="w-3.5 h-3.5 text-indigo-500" />
@@ -835,9 +929,23 @@ export default function App() {
           </div>
         )}
 
+        {/* DRAGGABLE DIVIDER */}
+        {viewMode === 'split' && (
+          <div 
+            onMouseDown={() => setIsDragging(true)}
+            className="w-2 bg-gray-200 dark:bg-zinc-800 hover:bg-indigo-500 cursor-col-resize transition flex items-center justify-center group z-10"
+            title="Drag to resize panels"
+          >
+            <div className="w-0.5 h-10 bg-gray-400 group-hover:bg-white rounded-full"></div>
+          </div>
+        )}
+
         {/* PREVIEW PANEL */}
         {(viewMode === 'split' || viewMode === 'preview') && (
-          <div className={`flex flex-col h-full bg-gray-100 dark:bg-zinc-950 overflow-y-auto ${viewMode === 'split' ? 'w-1/2' : 'w-full'} p-6 lg:p-10 transition-all`}>
+          <div 
+            style={viewMode === 'split' ? { width: `${100 - editorWidth}%` } : undefined}
+            className={`flex flex-col h-full bg-gray-100 dark:bg-zinc-950 overflow-y-auto ${viewMode === 'split' ? '' : 'w-full'} p-6 lg:p-10 transition-all`}
+          >
             <div className="flex items-center justify-between mb-4 max-w-3xl mx-auto w-full text-xs text-gray-500">
               <span className="font-serif italic">Live LaTeX Document View ({docFormat === 'a4' ? 'A4 11pt Report' : 'Beamer 16:9 Slides'})</span>
               <span>Instantaneous Render Engine Active</span>
@@ -898,58 +1006,67 @@ export default function App() {
                 })()}
               </div>
             ) : (
-              <div 
-                ref={paperRef}
-                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-                className={`printable-paper mx-auto w-full shadow-2xl transition-transform duration-150 max-w-[720px] p-10 lg:p-12 min-h-[960px] ${
-                  theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
-                  theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
-                  'bg-zinc-900 text-gray-100 border border-zinc-800'
-                }`}
-              >
-                {/* ACADEMIC RUNNING HEADER */}
-                <div className="pb-2.5 mb-6 border-b border-gray-400 dark:border-zinc-700 flex justify-between items-center text-[10px] font-serif text-gray-600 dark:text-gray-400">
-                  <span className="font-bold">{renderedContent.runningLeft}</span>
-                  <span className="italic truncate max-w-[240px] sm:max-w-sm">{renderedContent.runningCenter}</span>
-                  <span className="font-mono">{renderedContent.runningRight}</span>
-                </div>
+              <div className="space-y-12 max-w-[794px] mx-auto w-full">
+                {renderedContent.a4Pages.map((pageBody, pIdx) => (
+                  <div 
+                    key={pIdx}
+                    ref={pIdx === 0 ? paperRef : undefined}
+                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
+                    className={`printable-paper mx-auto w-full shadow-2xl transition-transform duration-150 max-w-[794px] h-[1123px] p-12 lg:p-14 relative pb-20 overflow-hidden ${
+                      theme === 'classic' ? 'bg-white text-gray-900 border border-gray-300' :
+                      theme === 'sepia' ? 'bg-[#fbf0d9] text-[#433422] border border-[#e5d2b3]' :
+                      'bg-zinc-900 text-gray-100 border border-zinc-800'
+                    }`}
+                  >
+                    <div>
+                      {/* ACADEMIC RUNNING HEADER */}
+                      <div className="pb-3 mb-6 border-b border-gray-400 dark:border-zinc-700 flex justify-between items-center text-[10px] font-serif text-gray-600 dark:text-gray-400">
+                        <span className="font-bold">{renderedContent.runningLeft}</span>
+                        <span className="italic truncate max-w-[240px] sm:max-w-sm">{renderedContent.runningCenter}</span>
+                        <span className="font-mono">{renderedContent.runningRight}</span>
+                      </div>
 
-                {/* DOCUMENT TITLE & AUTHOR */}
-                <div className="text-center pb-5 border-b border-gray-200 dark:border-zinc-800 mb-5">
-                  <h1 className="font-bold font-serif mb-2 tracking-wide text-xl">
-                    {renderedContent.title || 'Untitled Report'}
-                  </h1>
-                  {renderedContent.author && (
-                    <div className="text-xs font-serif font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {renderedContent.author}
-                    </div>
-                  )}
-                  {renderedContent.institute && (
-                    <div className="text-[11px] font-serif italic text-gray-500 dark:text-gray-400">
-                      {renderedContent.institute}
-                    </div>
-                  )}
-                </div>
+                      {/* DOCUMENT TITLE & AUTHOR (ONLY ON PAGE 1) */}
+                      {pIdx === 0 && (
+                        <div className="text-center pb-6 border-b border-gray-200 dark:border-zinc-800 mb-6">
+                          <h1 className="font-bold font-serif mb-2 tracking-wide text-2xl">
+                            {renderedContent.title || 'Untitled Report'}
+                          </h1>
+                          {renderedContent.author && (
+                            <div className="text-xs font-serif font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              {renderedContent.author}
+                            </div>
+                          )}
+                          {renderedContent.institute && (
+                            <div className="text-[11px] font-serif italic text-gray-500 dark:text-gray-400">
+                              {renderedContent.institute}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                {/* ABSTRACT IF PRESENT */}
-                {renderedContent.abstract && (
-                  <div className="my-5 px-5 py-2.5 bg-gray-50 dark:bg-zinc-800/50 border-l-3 border-indigo-600 font-serif text-xs">
-                    <h4 className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Abstract</h4>
-                    <p className="italic leading-normal text-justify">{renderedContent.abstract}</p>
+                      {/* ABSTRACT IF PRESENT (ONLY ON PAGE 1) */}
+                      {pIdx === 0 && renderedContent.abstract && (
+                        <div className="my-6 px-6 py-3 bg-gray-50 dark:bg-zinc-800/50 border-l-4 border-indigo-600 font-serif text-xs">
+                          <h4 className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Abstract</h4>
+                          <p className="italic leading-normal text-justify">{renderedContent.abstract}</p>
+                        </div>
+                      )}
+
+                      {/* DOCUMENT BODY CHUNK */}
+                      <div 
+                        className="font-serif text-sm leading-relaxed space-y-4"
+                        dangerouslySetInnerHTML={{ __html: pageBody }}
+                      />
+                    </div>
+
+                    {/* FOOTER ABSOLUTE AT BOTTOM */}
+                    <div className="absolute bottom-12 left-12 right-12 pt-4 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-serif bg-inherit">
+                      <span>Gummi LaTeX Studio Preview</span>
+                      <span>Page {pIdx + 1} of {renderedContent.a4Pages.length}</span>
+                    </div>
                   </div>
-                )}
-
-                {/* DOCUMENT BODY */}
-                <div 
-                  className="font-serif text-sm leading-normal space-y-3.5"
-                  dangerouslySetInnerHTML={{ __html: renderedContent.body }}
-                />
-
-                {/* FOOTER */}
-                <div className="mt-14 pt-4 border-t border-gray-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-gray-400 font-serif">
-                  <span>Gummi LaTeX Studio Preview</span>
-                  <span>Page 1 of 1</span>
-                </div>
+                ))}
               </div>
             )}
           </div>
